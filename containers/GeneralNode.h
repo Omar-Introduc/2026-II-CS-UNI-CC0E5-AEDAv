@@ -15,8 +15,6 @@ public:
     Ref  getRef()   const { return m_ref;   }
     T&   value()          { return m_value; } // acceso mutable para ApplyFunction
 
-    using Delim = CW;
-
   template <typename CharT, typename StreamTraits = std::char_traits<CharT>>
   friend std::basic_ostream<CharT, StreamTraits> &operator <<(
       std::basic_ostream<CharT, StreamTraits> &os, const GeneralNode<T> &node) {

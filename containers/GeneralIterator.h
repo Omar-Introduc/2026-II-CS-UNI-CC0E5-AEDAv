@@ -15,11 +15,12 @@ public:
     using pointer           = value_type *;
     using reference         = value_type&;
 protected:
-    pointer m_ptr;
+    pointer m_ptr   = nullptr;
+    pointer m_pStop = nullptr;
 public:
-    GeneralIterator(pointer ptr) : m_ptr(ptr) {}
-    value_type& operator*() const { return *m_ptr; }
-    // value_type* operator->()      { return m_ptr; }
+    GeneralIterator(pointer ptr, pointer pStop = nullptr) : m_ptr(ptr), m_pStop(pStop) {}
+    reference operator*() const { return *m_ptr; }
+    pointer   operator->() const { return m_ptr; }
     friend bool operator== (const Derived& a, const Derived& b) { return a.m_ptr == b.m_ptr; };
     friend bool operator!= (const Derived& a, const Derived& b) { return a.m_ptr != b.m_ptr; };
 };

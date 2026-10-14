@@ -91,8 +91,12 @@ void TestTraversal(Container &container) {
     // nodo cuyo valor sea mayor que el del primer elemento del container.
     if (!container.empty()) {
         auto threshold = (*container.begin()).getValue();
-        Node &found = container.FirstThat(IsGreaterThan<Node, decltype(threshold)>, threshold);
-        cout << "FirstThat (primer valor > " << threshold << "): " << found << endl;
+        try {
+            Node &found = container.FirstThat(IsGreaterThan<Node, decltype(threshold)>, threshold);
+            cout << "FirstThat (primer valor > " << threshold << "): " << found << endl;
+        } catch (const std::exception &e) {
+            cout << "FirstThat (ningun valor > " << threshold << "): " << e.what() << endl;
+        }
     }
 }
 
@@ -113,8 +117,12 @@ void TestForwardTraversal(Container &container){
     // Prueba de FirstThat(): primer nodo cuyo valor sea mayor que el primero
     if (container.begin() != container.end()) {
         auto threshold = (*container.begin()).getValue();
-        Node &found = container.FirstThat(IsGreaterThan<Node, decltype(threshold)>, threshold);
-        cout << "FirstThat (primer valor > " << threshold << "): " << found << endl;
+        try {
+            Node &found = container.FirstThat(IsGreaterThan<Node, decltype(threshold)>, threshold);
+            cout << "FirstThat (primer valor > " << threshold << "): " << found << endl;
+        } catch (const std::exception &e) {
+            cout << "FirstThat (ningun valor > " << threshold << "): " << e.what() << endl;
+        }
     }
 }
 
@@ -221,6 +229,15 @@ void DemoLinkedList()
     in.close();
     cout << "LinkedList leida desde archivo: " << new_list << endl;
     TestForwardTraversal(new_list);
+
+    // Prueba con orden descendente mediante LinkedListDescTraits
+    cout << "\n--- LinkedList con LinkedListDescTraits (orden descendente) ---" << endl;
+    LinkedList<LinkedListDescTraits<TX>> desc_list;
+    desc_list.insert(10, 1);
+    desc_list.insert(5, 2);
+    desc_list.insert(20, 3);
+    cout << "LinkedList descendente tras insert(10), insert(5), insert(20): " << desc_list << endl;
+    TestForwardTraversal(desc_list);
 }
 
 
@@ -243,40 +260,35 @@ void DemoCircularLinkedList() {
     clist.insert(40, 40);
     cout << "LC tras insert ordenado: " << clist << endl;
 
-    // 3. Imprimir N vueltas (Rúbrica oficial)
-    cout << "LC (2 vueltas completas con print_loops): ";
-    clist.print_loops(cout, 2);
-    cout << endl;
+    TestForwardTraversal(clist);
 
-    // 4. Recorrido con call
-    cout << "LC recorrido con call (1 vuelta): [";
+    // 3. Recorrido con call
+    cout << "LC recorrido con call: [";
     clist.call([](const auto& node) { cout << "(" << node.getValue() << "," << node.getRef() << ") "; });
     cout << "]" << endl;
 
-    // 5. Aplicar funciones (ApplyFunction)
+    // 4. Aplicar funciones (ApplyFunction)
     clist.ApplyFunction(AddOne);
     cout << "LC tras AddOne: " << clist << endl;
 
-    // 6. Persistencia (escritura en archivo)
+    // 5. Persistencia (escritura en archivo)
     ofstream out("circularlist.txt");
     out << clist;
     out.close();
 
-    // 7. Prueba de clear y push_back post-clear
+    // 6. Prueba de clear y push_back post-clear
     clist.clear();
     cout << "LC tras clear (empty = " << (clist.empty() ? "true" : "false") << "): " << clist << endl;
     clist.push_back(99, 9);
     cout << "LC nuevo push_back tras clear: " << clist << endl;
 
-    // 8. Prueba de lectura desde archivo
+    // 7. Prueba de lectura desde archivo
     IntCircularList read_clist;
     ifstream in("circularlist.txt");
     in >> read_clist;
     in.close();
     cout << "LC leida desde archivo: " << read_clist << endl;
-    cout << "LC leida (2 vueltas): ";
-    read_clist.print_loops(cout, 2);
-    cout << endl;
+    TestForwardTraversal(read_clist);
 }
 
 void DemoDoublyLinkedList() {
@@ -344,18 +356,16 @@ void DemoCircularDoublyLinkedList() {
     cdlist.insert(400, 40);
     cout << "LDEC tras insert ordenado: " << cdlist << endl;
 
-    // 3. Vueltas adelante y atrás con print_loops
-    cout << "LDEC (2 vueltas adelante): ";
-    cdlist.print_loops(cout, 2, true);
-    cout << endl;
+    TestTraversal(cdlist);
 
-    cout << "LDEC (2 vueltas atras):    ";
-    cdlist.print_loops(cout, 2, false);
-    cout << endl;
+    // 3. Recorridos con call y rcall
+    cout << "LDEC call (adelante): [";
+    cdlist.call([](const auto& node) { cout << "(" << node.getValue() << "," << node.getRef() << ") "; });
+    cout << "]" << endl;
 
-    // 4. rcall con 2 vueltas
-    cout << "LDEC rcall (2 vueltas atras): [";
-    cdlist.rcall([](const auto& node) { cout << "(" << node.getValue() << "," << node.getRef() << ") "; }, 2);
+    // 4. rcall hacia atrás
+    cout << "LDEC rcall (hacia atras): [";
+    cdlist.rcall([](const auto& node) { cout << "(" << node.getValue() << "," << node.getRef() << ") "; });
     cout << "]" << endl;
 
     // 5. ApplyFunction
@@ -379,8 +389,6 @@ void DemoCircularDoublyLinkedList() {
     in >> read_cdlist;
     in.close();
     cout << "LDEC leida desde archivo (1 vuelta): " << read_cdlist << endl;
-    cout << "LDEC leida (2 vueltas atras): ";
-    read_cdlist.print_loops(cout, 2, false);
-    cout << endl;
+    TestTraversal(read_cdlist);
 }
 

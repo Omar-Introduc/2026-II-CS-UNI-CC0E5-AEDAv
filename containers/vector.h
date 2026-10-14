@@ -11,9 +11,7 @@ using namespace std;
 template <typename T>
 class VectorForwardIterator : public GeneralIterator<VectorForwardIterator<T>, T> {
 public:
-    using value_type        = T;
-    using MySelf            = VectorForwardIterator<T>;
-    using Parent            = GeneralIterator<MySelf, T>;
+    using Parent = GeneralIterator<VectorForwardIterator<T>, T>;
     using Parent::Parent; // Inherit constructor
 
     // Prefix increment
@@ -23,9 +21,7 @@ public:
 template <typename T>
 class VectorBackwardIterator : public GeneralIterator<VectorBackwardIterator<T>, T> {
 public:
-    using value_type        = T;
-    using MySelf            = VectorBackwardIterator<T>;
-    using Parent            = GeneralIterator<MySelf, T>;
+    using Parent = GeneralIterator<VectorBackwardIterator<T>, T>;
     using Parent::Parent; // Inherit constructor
 
     // Prefix increment
@@ -171,23 +167,17 @@ public:
         return call(func, std::forward<Args>(args)...);
     }
     template<typename Func, typename... Args>
-    decltype(auto) call(Func func, Args&&... args)
-    {    lock_guard<mutex> lock(m_mutex);
-        if constexpr(is_void_v<invoke_result_t<Func, Node&, Args...>>)
-            ::call(begin(), end(), std::forward<Func>(func), std::forward<Args>(args)...);
-        else // return type is not void:
-            return ::call(begin(), end(), std::forward<Func>(func), std::forward<Args>(args)...);
+    decltype(auto) call(Func func, Args&&... args) {
+        lock_guard<mutex> lock(m_mutex);
+        return ::call(begin(), end(), std::forward<Func>(func), std::forward<Args>(args)...);
     }
 
     // Igual que call(), pero recorriendo el container en sentido inverso
     // (rbegin()/rend()) en vez de hacia adelante.
     template<typename Func, typename... Args>
-    decltype(auto) rcall(Func func, Args&&... args)
-    {    lock_guard<mutex> lock(m_mutex);
-        if constexpr(is_void_v<invoke_result_t<Func, Node&, Args...>>)
-            ::call(rbegin(), rend(), std::forward<Func>(func), std::forward<Args>(args)...);
-        else // return type is not void:
-            return ::call(rbegin(), rend(), std::forward<Func>(func), std::forward<Args>(args)...);
+    decltype(auto) rcall(Func func, Args&&... args) {
+        lock_guard<mutex> lock(m_mutex);
+        return ::call(rbegin(), rend(), std::forward<Func>(func), std::forward<Args>(args)...);
     }
 };
 

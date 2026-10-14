@@ -1,22 +1,20 @@
-  #ifndef __DOUBLY_LINKED_LIST_NODE_H__
-  #define __DOUBLY_LINKED_LIST_NODE_H__
+#ifndef __DOUBLY_LINKED_LIST_NODE_H__
+#define __DOUBLY_LINKED_LIST_NODE_H__
 
-  #include "linkedlist.h"
+#include "linkedlist.h"
 
-  template <typename Traits>
-  class DoublyLinkedListNode : public LinkedListNode<Traits> {
-  public:
-      using value_type = typename Traits::value_type;
-      using Node       = typename Traits::Node;
-      using NodePtr    = Node*;
+template <typename Traits>
+class DoublyLinkedListNode : public LinkedListNode<Traits> {
+public:
+    using Base = LinkedListNode<Traits>;
 
-      Node* m_pPrev = nullptr;
+    typename Base::NodePtr m_pPrev = nullptr;
 
-      DoublyLinkedListNode() 
-          : LinkedListNode<Traits>(), m_pPrev(nullptr) {}
+    DoublyLinkedListNode() = default;
+    DoublyLinkedListNode(const typename Base::value_type& value, Ref ref,
+                         typename Base::NodePtr pNext = nullptr,
+                         typename Base::NodePtr pPrev = nullptr)
+        : Base(value, ref, pNext), m_pPrev(pPrev) {}
+};
 
-      DoublyLinkedListNode(const value_type& value, Ref ref, Node* pNext = nullptr, Node* pPrev = nullptr)
-          : LinkedListNode<Traits>(value, ref, pNext), m_pPrev(pPrev) {}
-  };
-
-  #endif // __DOUBLY_LINKED_LIST_NODE_H__
+#endif // __DOUBLY_LINKED_LIST_NODE_H__

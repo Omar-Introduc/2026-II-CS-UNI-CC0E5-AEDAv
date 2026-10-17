@@ -8,6 +8,7 @@
 #include "containers/vector.h"
 #include "containers/linkedlist.h"
 #include "Demos.h"
+#include "containers/Heap.h"
 using namespace std;
 
 void AddOne(GeneralNode<TX> &node) {
@@ -88,8 +89,12 @@ void TestTraversal(Container &container) {
     // nodo cuyo valor sea mayor que el del primer elemento del container.
     if (!container.empty()) {
         auto threshold = (*container.begin()).getValue();
-        Node &found = container.FirstThat(IsGreaterThan<Node, decltype(threshold)>, threshold);
-        cout << "FirstThat (primer valor > " << threshold << "): " << found << endl;
+        try {
+            Node &found = container.FirstThat(IsGreaterThan<Node, decltype(threshold)>, threshold);
+            cout << "FirstThat (primer valor > " << threshold << "): " << found << endl;
+        } catch (const std::exception &e) {
+            cout << "FirstThat (ningun valor > " << threshold << "): " << e.what() << endl;
+        }
     }
 }
 
@@ -218,4 +223,65 @@ void DemoLinkedList()
     in.close();
     cout << "LinkedList leida desde archivo: " << new_list << endl;
     TestForwardTraversal(new_list);
+}
+
+template <typename HeapType>
+void TestHeap(HeapType &heap, const string &filename) {
+    ofstream(filename, ios::trunc).close();
+
+    // 1. Reaprovecha TestContainer directamente (inserta con push_back, prueba write() y cout <<)
+    TestContainer(heap, {{30, 3}, {10, 1}, {50, 5}, {20, 2}, {40, 4}, {5, 0}, {60, 6}}, filename);
+
+    // 2. Reaprovecha TestTraversal directamente (prueba call hacia adelante, rcall hacia atrás y FirstThat)
+    TestTraversal(heap);
+
+    // 3. Prueba de lectura desde archivo con operator>> generalizado
+    HeapType read_heap;
+    ifstream in(filename);
+    in >> read_heap;
+    in.close();
+    cout << "Heap leido desde archivo (" << filename << "): " << read_heap << endl;
+
+    // 4. Prueba de extracción ordenada con pop() (HeapifyDown / HeapSort)
+    cout << "Extraccion ordenada con pop(): [ ";
+    while (!read_heap.empty())
+        cout << read_heap.pop() << " ";
+    cout << "]" << endl;
+}
+
+void DemoHeap() {
+    cout << "\n=== DEMO MINHEAP ===" << endl;
+    MinHeap<TX> min_heap;
+    TestHeap(min_heap, "minheap.txt");
+
+    cout << "\n=== DEMO MAXHEAP ===" << endl;
+    MaxHeap<TX> max_heap;
+    TestHeap(max_heap, "maxheap.txt");
+}
+
+void DemoHeapRaceCondition() {
+    const size_t N = 50000;
+    vector<pair<TX, Ref>> values(N);
+    for (size_t i = 0; i < N; ++i)
+        values[i] = {static_cast<TX>(i), static_cast<Ref>(i)};
+
+    MinHeap<TX> heap;
+    vector<thread> workers;
+    for (int t = 0; t < NThreads; ++t) {
+        workers.emplace_back([&heap, &values, N, t]() {
+            for (size_t i = t; i < N; i += NThreads)
+                heap.push_back(values[i].first, values[i].second);
+        });
+    }
+    for (auto &w : workers)
+        w.join();
+
+    cout << "\nDemoHeapRaceCondition: se esperaban " << N << " elementos, "
+         << "el Heap quedo con " << heap.size() << endl;
+    if (heap.size() == N) {
+        cout << "  No se perdio ningun elemento: el mutex de push/HeapifyUp "
+             << "sincroniza correctamente las inserciones concurrentes" << endl;
+    } else {
+        cout << "  *** Race condition detectada en Heap: se perdieron inserciones ***" << endl;
+    }
 }

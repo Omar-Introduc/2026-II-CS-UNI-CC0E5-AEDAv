@@ -3,6 +3,8 @@
 #include <utility> // std::forward
 #include <type_traits> // std::is_void_v, std::invoke_result_t
 #include <stdexcept> // std::runtime_error
+#include <mutex>
+#include <concepts>
 using namespace std;
 
 template <typename Iterator, typename Func, typename... Args>
@@ -59,9 +61,98 @@ decltype(auto) FirstThat(Iterator begin, Iterator end, Func func, Args&&... args
 
 // Iterator Level #4
 template <typename Container, typename Func, typename... Args>
+requires requires(Container& c) { c.begin(); c.end(); }
 void ApplyFunction(Container &container, Func func, Args&&... args) {
-    for (auto &v : container)
-        func(v, std::forward<Args>(args)...);
+    container.call(std::forward<Func>(func), std::forward<Args>(args)...);
 }
 
+template <typename Container, typename Func, typename... Args>
+requires requires(Container& c) { c.begin(); c.end(); }
+decltype(auto) FirstThat(Container& container, Func func, Args&&... args) {
+    return container.FirstThat(std::forward<Func>(func), std::forward<Args>(args)...);
+}
+
+template <typename Derived, typename Traits>
+class ContainerBase {
+public:
+    using value_type = typename Traits::value_type;
+    using Node       = typename Traits::Node;
+    using NodePtr    = Node*;
+
+protected:
+    mutable std::mutex m_mutex;
+
+    Derived&       derived()       { return static_cast<Derived&>(*this); }
+    const Derived& derived() const { return static_cast<const Derived&>(*this); }
+
+public:
+    template <typename Func, typename... Args>
+    decltype(auto) call(Func func, Args&&... args) {
+        std::scoped_lock lock(m_mutex);
+        return ::call(derived().begin(), derived().end(),
+                      std::forward<Func>(func), std::forward<Args>(args)...);
+    }
+
+    // rcall condicional: solo participa si Derived tiene rbegin() y rend() (Vector y Heap)
+    template <typename Func, typename... Args>
+    decltype(auto) rcall(Func func, Args&&... args)
+    requires requires(Derived& d) { d.rbegin(); d.rend(); } {
+        std::scoped_lock lock(m_mutex);
+        return ::call(derived().rbegin(), derived().rend(),
+                      std::forward<Func>(func), std::forward<Args>(args)...);
+    }
+
+    template <typename Func, typename... Args>
+    decltype(auto) ApplyFunction(Func func, Args&&... args) {
+        return call(std::forward<Func>(func), std::forward<Args>(args)...);
+    }
+
+    template <typename Func, typename... Args>
+    decltype(auto) FirstThat(Func func, Args&&... args) {
+        return call(std::forward<Func>(func), std::forward<Args>(args)...);
+    }
+
+    std::ostream& write(std::ostream& os) const { return os << derived(); }
+    std::istream& read(std::istream& is)        { return is >> derived(); }
+};
+
+template <typename Container>
+requires requires(const Container& c) {
+    c.begin();
+    c.end();
+    typename Container::Node;
+} && (!std::is_same_v<std::remove_cvref_t<Container>, std::string>)
+  && (!std::is_same_v<std::remove_cvref_t<Container>, std::string_view>)
+std::ostream& operator<<(std::ostream& os, const Container& container) {
+    os << "[";
+    bool first = true;
+    for (const auto& node : container) {
+        if (!first) os << ",";
+        os << node;
+        first = false;
+    }
+    return os << "]";
+}
+
+template <typename Container>
+requires requires(Container& c) {
+    c.clear();
+    typename Container::Node;
+}
+std::istream& operator>>(std::istream& is, Container& container) {
+    using Node  = typename Container::Node;
+    using Delim = typename Node::Delim;
+    Delim d;
+    Node node;
+    container.clear();
+    if (!(is >> d) || d != '[') return is;
+    if (is >> d && d != ']') {
+        is.unget();
+        while (is >> node >> d) {
+            container.push_back(node.getValue(), node.getRef());
+            if (d == ']') break;
+        }
+    }
+    return is;
+}
 #endif // __FOREACH_H__

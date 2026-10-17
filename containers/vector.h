@@ -11,9 +11,7 @@ using namespace std;
 template <typename T>
 class VectorForwardIterator : public GeneralIterator<VectorForwardIterator<T>, T> {
 public:
-    using value_type        = T;
-    using MySelf            = VectorForwardIterator<T>;
-    using Parent            = GeneralIterator<MySelf, T>;
+    using Parent = GeneralIterator<VectorForwardIterator<T>, T>;
     using Parent::Parent; // Inherit constructor
 
     // Prefix increment
@@ -23,26 +21,27 @@ public:
 template <typename T>
 class VectorBackwardIterator : public GeneralIterator<VectorBackwardIterator<T>, T> {
 public:
-    using value_type        = T;
-    using MySelf            = VectorBackwardIterator<T>;
-    using Parent            = GeneralIterator<MySelf, T>;
+    using Parent = GeneralIterator<VectorBackwardIterator<T>, T>;
     using Parent::Parent; // Inherit constructor
 
     // Prefix increment
     VectorBackwardIterator& operator++() { --Parent::m_ptr; return *this; }
 };
 
-template <typename T>
-struct VectorAscTraits {
-    using value_type        = T;
-    using Node              = GeneralNode<T>;
+template <typename OrderTrait>
+struct VectorTraits : public OrderTrait {
+    using Node             = GeneralNode<typename OrderTrait::value_type>;
     using ForwardIterator   = VectorForwardIterator<Node>;  // itera sobre Node, no sobre T
     using BackwardIterator  = VectorBackwardIterator<Node>; // itera sobre Node, no sobre T
 };
 
+template <typename T> using VectorAscTraits  = VectorTraits<AscendingTraits<T>>;
+template <typename T> using VectorDescTraits = VectorTraits<DescendingTraits<T>>;
+
 template <typename Traits>
-class Vector {
+class Vector : public ContainerBase<Vector<Traits>, Traits>{
 public:
+    using Base             = ContainerBase<Vector<Traits>, Traits>;
     using value_type        = Traits::value_type;
     using Node              = Traits::Node;
     using ForwardIterator   = Traits::ForwardIterator;
@@ -51,7 +50,6 @@ private:
     Node        *m_data     = nullptr;   // puntero al arreglo dinámico
     size_t       m_size     = 0,         // cantidad actual
                  m_capacity = 0;         // capacidad
-    mutex        m_mutex;                // mutex para sincronización
 
     void resize(size_t new_cap) {
         if (new_cap <= m_capacity) return;
@@ -64,7 +62,7 @@ private:
     }
 
 public:
-    Vector() {}
+    Vector() = default;
 
     // Cada elemento de la lista es una pareja (valor, ref) para un Node
     Vector(initializer_list<pair<value_type, Ref>> values) {
@@ -76,13 +74,20 @@ public:
         clear();
     }
 
-    Vector(const Vector& other) {
-        resize(other.m_size);
-        for (size_t i = 0; i < other.m_size; ++i)
-            m_data[i] = other.m_data[i];
-        m_size = other.m_size;
-    }
+    Vector(const Vector& other) : Base() { *this = other; }
 
+    Vector& operator=(const Vector& other) {
+        if (this != &other) {
+            clear();
+            scoped_lock lock(this->m_mutex, other.m_mutex);
+            resize(other.m_size);
+            for (size_t i = 0; i < other.m_size; ++i)
+                m_data[i] = other.m_data[i];
+            m_size = other.m_size;
+        }
+        return *this;
+    }
+    
     // Move constructor and move assignment operator
     Vector(Vector&& other) noexcept {
         m_data     = std::exchange(other.m_data, nullptr);
@@ -102,17 +107,16 @@ public:
     }
 
     void push_back(const value_type& value, Ref ref) {
-        lock_guard<mutex> lock(m_mutex);
+        lock_guard<mutex> lock(this->m_mutex);
         if (m_size == m_capacity) {
             size_t new_cap = (m_capacity == 0) ? 10 : m_capacity * 2;
             resize(new_cap);
         }
-        m_data[m_size] = Node(value, ref);
-        ++m_size;
+        m_data[m_size++] = Node(value, ref);
     }
 
     void pop_back() {
-        lock_guard<mutex> lock(m_mutex);
+        lock_guard<mutex> lock(this->m_mutex);
         if (m_size > 0)
             --m_size;
     }
@@ -122,82 +126,24 @@ public:
         return m_data[index];
     }
 
-    Node& at(size_t index) {
-        if (index >= m_size) throw std::out_of_range("Indice fuera de rango");
-        return m_data[index];
-    }
+    Node&       at(size_t index)       { return (*this)[index]; }
+    const Node& at(size_t index) const { return (*this)[index]; }
 
     size_t size()     const { return m_size; }
     size_t capacity() const { return m_capacity; }
     bool   empty()    const { return m_size == 0; }
 
     void clear() {
-        lock_guard<mutex> lock(m_mutex);
+        lock_guard<mutex> lock(this->m_mutex);
         delete [] m_data;
         m_data     = nullptr;
         m_size     = 0;
         m_capacity = 0;
     }
 
-    ForwardIterator   begin() { return ForwardIterator(m_data); }
-    ForwardIterator   end()   { return ForwardIterator(m_data + m_size); }
-    BackwardIterator rbegin() { return BackwardIterator(m_data + m_size - 1); }
-    BackwardIterator rend()   { return BackwardIterator(m_data - 1); }
-
-    // Persistencia
-    ostream &write(ostream &os){
-        // TODO: convertirla en una linea que usa la funcion ApplyFunction generica
-        lock_guard<mutex> lock(m_mutex);
-        os << "[";
-        for (size_t i = 0; i < size()-1; ++i)
-            os << m_data[i] << ",";
-        if (size() > 0)
-            os << m_data[size()-1];
-        return os << "]";
-    }
-
-    // TODO: implementar la lectura de un vector desde un stream
-    istream &read(istream &is){
-        // Implementation for reading vector from stream
-    }
-
-    template <typename Func, typename... Args>
-    void ApplyFunction(Func func, Args... args) {
-        call(func, std::forward<Args>(args)...);
-    }
-    template <typename Func, typename... Args>
-    Node& FirstThat(Func func, Args... args) {
-        return call(func, std::forward<Args>(args)...);
-    }
-    template<typename Func, typename... Args>
-    decltype(auto) call(Func func, Args&&... args)
-    {    lock_guard<mutex> lock(m_mutex);
-        if constexpr(is_void_v<invoke_result_t<Func, Node&, Args...>>)
-            ::call(begin(), end(), std::forward<Func>(func), std::forward<Args>(args)...);
-        else // return type is not void:
-            return ::call(begin(), end(), std::forward<Func>(func), std::forward<Args>(args)...);
-    }
-
-    // Igual que call(), pero recorriendo el container en sentido inverso
-    // (rbegin()/rend()) en vez de hacia adelante.
-    template<typename Func, typename... Args>
-    decltype(auto) rcall(Func func, Args&&... args)
-    {    lock_guard<mutex> lock(m_mutex);
-        if constexpr(is_void_v<invoke_result_t<Func, Node&, Args...>>)
-            ::call(rbegin(), rend(), std::forward<Func>(func), std::forward<Args>(args)...);
-        else // return type is not void:
-            return ::call(rbegin(), rend(), std::forward<Func>(func), std::forward<Args>(args)...);
-    }
+    ForwardIterator  begin()  const { return ForwardIterator(m_data); }
+    ForwardIterator  end()    const { return ForwardIterator(m_data + m_size); }
+    BackwardIterator rbegin() const { return BackwardIterator(m_data + m_size - 1); }
+    BackwardIterator rend()   const { return BackwardIterator(m_data - 1); }
 };
-
-template <typename T>
-ostream& operator<<(ostream &os, Vector<T> &vec) {
-    return vec.write(os);
-}
-
-template <typename T>
-istream& operator>>(istream &is, Vector<T> &vec) {
-    return vec.read(is);
-}
-
 #endif // __VECTOR_H__

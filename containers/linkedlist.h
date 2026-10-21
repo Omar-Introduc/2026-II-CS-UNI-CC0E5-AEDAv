@@ -59,8 +59,9 @@ template <typename T> using LinkedListAscTraits  = LinkedListTraits<AscendingTra
 template <typename T> using LinkedListDescTraits = LinkedListTraits<DescendingTraits<T>>;
 
 template <typename Traits>
-class LinkedList {
+class LinkedList : public ContainerBase<LinkedList<Traits>, Traits> {
 public:
+    using Base            = ContainerBase<LinkedList<Traits>, Traits>;
     using value_type      = typename Traits::value_type;
     using Node            = typename Traits::Node;
     using NodePtr         = Node*;
@@ -68,10 +69,10 @@ public:
     using Compare         = typename Traits::Compare;
 
 protected:
+    using Base::m_mutex;
     NodePtr            m_pRoot = nullptr;
     NodePtr            m_pTail = nullptr;
     Compare            m_comp{};
-    mutable std::mutex m_mutex;
 
     NodePtr GetRoot() const { return m_pRoot; }
 
@@ -100,7 +101,7 @@ protected:
 
 public:
     LinkedList() = default;
-    LinkedList(const LinkedList& other) { *this = other; }
+    LinkedList(const LinkedList& other) : Base() { *this = other; }
     LinkedList(std::initializer_list<std::pair<value_type, Ref>> values) {
         for (const auto& v : values) push_back(v.first, v.second);
     }
@@ -130,7 +131,7 @@ public:
         m_pTail = nullptr;
     }
 
-    void push_back(const value_type& value, Ref ref) {
+    void push_back(const value_type& value, Ref ref = Ref{}) {
         std::scoped_lock lock(m_mutex);
         NodePtr new_node = new Node(value, ref, nullptr);
         if (!m_pRoot) {
@@ -155,62 +156,6 @@ public:
     ForwardIterator begin() const { return ForwardIterator(m_pRoot, m_pTail); }
     ForwardIterator end()   const { return ForwardIterator(nullptr, m_pTail); }
 
-    template <typename Func, typename... Args>
-    decltype(auto) call(Func func, Args&&... args) {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        return ::call(begin(), end(), std::forward<Func>(func), std::forward<Args>(args)...);
-    }
-
-    template <typename Func, typename... Args>
-    decltype(auto) ApplyFunction(Func func, Args&&... args) {
-        return call(func, std::forward<Args>(args)...);
-    }
-
-    template <typename Func, typename... Args>
-    decltype(auto) FirstThat(Func func, Args&&... args) {
-        return call(func, std::forward<Args>(args)...);
-    }
-
-    template <typename CharT, typename StreamTraits = std::char_traits<CharT>>
-    std::basic_ostream<CharT, StreamTraits>& write(std::basic_ostream<CharT, StreamTraits>& os) {
-        return os << *this;
-    }
-
-    template <typename CharT, typename StreamTraits = std::char_traits<CharT>>
-    std::basic_istream<CharT, StreamTraits>& read(std::basic_istream<CharT, StreamTraits>& is) {
-        return is >> *this;
-    }
-
-    template <typename CharT, typename StreamTraits = std::char_traits<CharT>>
-    friend std::basic_ostream<CharT, StreamTraits>& operator<<(
-        std::basic_ostream<CharT, StreamTraits>& os, const LinkedList<Traits>& list) {
-        std::lock_guard lock(list.m_mutex);
-        bool first = true;
-        os << static_cast<CharT>('[');
-        for (const auto& node : list) {
-            if (!first) os << static_cast<CharT>(',');
-            os << node;
-            first = false;
-        }
-        return os << static_cast<CharT>(']');
-    }
-
-    template <typename CharT, typename StreamTraits = std::char_traits<CharT>>
-    friend std::basic_istream<CharT, StreamTraits>& operator>>(
-        std::basic_istream<CharT, StreamTraits>& is, LinkedList<Traits>& list) {
-        CharT d;
-        Node node;
-        list.clear();
-        is >> d;
-        if (is >> d && d != static_cast<CharT>(']')) {
-            is.unget();
-            while (is >> node >> d) {
-                list.push_back(node.getValue(), node.getRef());
-                if (d == static_cast<CharT>(']')) break;
-            }
-        }
-        return is;
-    }
 };
 
 #endif // __LINKEDLIST_H__

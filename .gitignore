@@ -59,6 +59,8 @@ compile_commands.json
 *.swp
 vector*.txt
 list*.txt
+binarytree*.txt
+*heap*.txt
 
 # vcpkg
 vcpkg_installed/

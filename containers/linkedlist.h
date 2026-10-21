@@ -34,6 +34,8 @@ public:
     }
 };
 
+#ifndef __ORDER_TRAITS__
+#define __ORDER_TRAITS__
 template <typename T, typename _Compare>
 struct DefaultTraits {
     using value_type = T;
@@ -45,6 +47,7 @@ struct AscendingTraits : public DefaultTraits<T, _Compare> {};
 
 template <typename T, typename _Compare = std::greater<T>>
 struct DescendingTraits : public DefaultTraits<T, _Compare> {};
+#endif // __ORDER_TRAITS__
 
 template <typename OrderTrait>
 struct LinkedListTraits : public OrderTrait {

@@ -28,21 +28,24 @@ public:
     VectorBackwardIterator& operator++() { --Parent::m_ptr; return *this; }
 };
 
-template <typename T>
-struct VectorAscTraits {
-    using value_type        = T;
-    using Node              = GeneralNode<T>;
-    using ForwardIterator   = VectorForwardIterator<Node>;  // itera sobre Node, no sobre T
-    using BackwardIterator  = VectorBackwardIterator<Node>; // itera sobre Node, no sobre T
+template <typename OrderTrait>
+struct VectorTraits : public OrderTrait {
+    using Node             = GeneralNode<typename OrderTrait::value_type>;
+    using ForwardIterator  = VectorForwardIterator<Node>;  // itera sobre Node, no sobre T
+    using BackwardIterator = VectorBackwardIterator<Node>; // itera sobre Node, no sobre T
 };
 
+template <typename T> using VectorAscTraits  = VectorTraits<AscendingTraits<T>>;
+template <typename T> using VectorDescTraits = VectorTraits<DescendingTraits<T>>;
+
 template <typename Traits>
-class Vector {
+class Vector : public ContainerBase<Vector<Traits>, Traits> {
 public:
-    using value_type        = Traits::value_type;
-    using Node              = Traits::Node;
-    using ForwardIterator   = Traits::ForwardIterator;
-    using BackwardIterator  = Traits::BackwardIterator;
+    using Base              = ContainerBase<Vector<Traits>, Traits>;
+    using value_type        = typename Traits::value_type;
+    using Node              = typename Traits::Node;
+    using ForwardIterator   = typename Traits::ForwardIterator;
+    using BackwardIterator  = typename Traits::BackwardIterator;
 private:
     Node        *m_data     = nullptr;   // puntero al arreglo dinámico
     size_t       m_size     = 0,         // cantidad actual
@@ -97,7 +100,7 @@ public:
         return *this;
     }
 
-    void push_back(const value_type& value, Ref ref) {
+    void push_back(const value_type& value, Ref ref = Ref{}) {
         lock_guard<mutex> lock(m_mutex);
         if (m_size == m_capacity) {
             size_t new_cap = (m_capacity == 0) ? 10 : m_capacity * 2;
@@ -135,27 +138,19 @@ public:
         m_capacity = 0;
     }
 
-    ForwardIterator   begin() { return ForwardIterator(m_data); }
-    ForwardIterator   end()   { return ForwardIterator(m_data + m_size); }
-    BackwardIterator rbegin() { return BackwardIterator(m_data + m_size - 1); }
-    BackwardIterator rend()   { return BackwardIterator(m_data - 1); }
+    ForwardIterator   begin()  const { return ForwardIterator(m_data); }
+    ForwardIterator   end()    const { return ForwardIterator(m_data + m_size); }
+    BackwardIterator rbegin()  const { return BackwardIterator(m_data + m_size - 1); }
+    BackwardIterator rend()    const { return BackwardIterator(m_data - 1); }
 
     // Persistencia
-    ostream &write(ostream &os){
-        // TODO: convertirla en una linea que usa la funcion ApplyFunction generica
-        lock_guard<mutex> lock(m_mutex);
-        os << "[";
-        for (size_t i = 0; i < size()-1; ++i)
-            os << m_data[i] << ",";
-        if (size() > 0)
-            os << m_data[size()-1];
-        return os << "]";
+    ostream &write(ostream &os) const {
+        return Base::write(os);
     }
 
     // TODO: implementar la lectura de un vector desde un stream
-    istream &read(istream &is){
-        // Implementation for reading vector from stream
-        return is;
+    istream &read(istream &is) {
+        return Base::read(is);
     }
 
     template <typename Func, typename... Args>
@@ -180,15 +175,5 @@ public:
         return ::call(rbegin(), rend(), std::forward<Func>(func), std::forward<Args>(args)...);
     }
 };
-
-template <typename T>
-ostream& operator<<(ostream &os, Vector<T> &vec) {
-    return vec.write(os);
-}
-
-template <typename T>
-istream& operator>>(istream &is, Vector<T> &vec) {
-    return vec.read(is);
-}
 
 #endif // __VECTOR_H__

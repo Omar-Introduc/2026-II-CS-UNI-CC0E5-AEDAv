@@ -2,6 +2,23 @@
 #define __GENERAL_NODE_H__
 #include <iostream>
 #include "../types.h" // Ref
+#include <functional>
+
+#ifndef __ORDER_TRAITS__
+#define __ORDER_TRAITS__
+template <typename T, typename _Compare>
+struct DefaultTraits {
+    using value_type = T;
+    using Compare    = _Compare;
+};
+
+template <typename T, typename _Compare = std::less<T>>
+struct AscendingTraits : public DefaultTraits<T, _Compare> {};
+
+template <typename T, typename _Compare = std::greater<T>>
+struct DescendingTraits : public DefaultTraits<T, _Compare> {};
+#endif // __ORDER_TRAITS__
+
 template <typename T>
 struct GeneralNode{
 private:

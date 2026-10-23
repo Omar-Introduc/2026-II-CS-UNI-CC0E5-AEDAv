@@ -28,51 +28,50 @@ void RunContainerTestSuite(const string& title,
                            const vector<pair<typename Container::value_type, Ref>>& initialValues,
                            const vector<pair<typename Container::value_type, Ref>>& extraInserts = {}) {
     using Node = typename Container::Node;
-    cout << "\n======================================================\n  " << title
-         << "\n======================================================\n";
+    cout << "\n\n\033[44;37m  [ " << title << " ]  \033[0m\n";
 
     Container c;
     for (const auto& [v, r] : initialValues) c.push_back(v, r);
 
-    cout << "Container using write(): "; c.write(cout) << endl;
+    cout << "  write():            "; c.write(cout) << endl;
     { ofstream of(filename); c.write(of) << '\n'; }
-    cout << "Container using cout directly: " << c << endl;
+    cout << "  cout << c:          " << c << endl;
 
     if constexpr (requires { c.insert(typename Container::value_type{}, Ref{}); }) {
         for (const auto& [v, r] : extraInserts) c.insert(v, r);
-        if (!extraInserts.empty()) cout << "Tras inserts ordenados: " << c << endl;
+        if (!extraInserts.empty()) cout << "  Inserts ordenados:  " << c << endl;
     }
 
-    cout << "Forward traversal:  ["; c.call(PrintNode<Node>, cout); cout << "]\n";
+    cout << "  Forward traversal:  [ "; c.call(PrintNode<Node>, cout); cout << "]\n";
     if constexpr (requires { c.rbegin(); c.rend(); }) {
-        cout << "Backward traversal: ["; c.rcall(PrintNode<Node>, cout); cout << "]\n";
+        cout << "  Backward traversal: [ "; c.rcall(PrintNode<Node>, cout); cout << "]\n";
     }
 
     if (!c.empty()) {
         auto threshold = (*c.begin()).getValue();
         try {
-            cout << "FirstThat (primer valor > " << threshold << "): "
-                 << c.FirstThat(IsGreaterThan<Node, decltype(threshold)>, threshold) << endl;
+            auto res = c.FirstThat(IsGreaterThan<Node, decltype(threshold)>, threshold);
+            cout << "  \033[43;30m FirstThat (> " << threshold << "): " << res << " \033[0m\n";
         } catch (const exception& e) {
-            cout << "FirstThat (ningun valor > " << threshold << "): " << e.what() << endl;
+            cout << "  FirstThat (> " << threshold << "): (ninguno cumple)\n";
         }
     }
 
     Container c_read;
     { ifstream in(filename); in >> c_read; }
-    cout << "Persistencia leida desde archivo: " << c_read << endl;
+    cout << "  Persistencia file:  " << c_read << endl;
 
     if constexpr (requires { c_read.pop(); }) {
-        cout << "Extraccion ordenada con pop(): [ ";
+        cout << "  \033[46;30m Extraccion ordenada con pop(): [ ";
         while (!c_read.empty()) cout << c_read.pop() << " ";
-        cout << "]\n";
+        cout << "] \033[0m\n";
     }
 
     c.clear();
-    cout << "Tras clear(): empty = " << boolalpha << c.empty() << " " << c << endl;
+    cout << "  Tras clear():       empty = " << boolalpha << c.empty() << " " << c << endl;
     if (!initialValues.empty()) {
         c.push_back(initialValues.front().first, initialValues.front().second);
-        cout << "Nuevo push_back post-clear: " << c << endl;
+        cout << "  Post-clear push:    " << c << endl;
     }
 }
 
@@ -84,6 +83,7 @@ void DemoVector() {
 }
 
 void DemoRaceCondition() {
+    cout << "\n\n\033[44;37m  [ DEMO RACE CONDITION ]  \033[0m\n";
     const long long N = 200000;
     Vector<VectorAscTraits<TX>> vec;
     {
@@ -97,8 +97,12 @@ void DemoRaceCondition() {
 
     long long expectedSum = N * (N - 1) / 2, actualSum = 0;
     vec.call([&actualSum](const auto& node) { actualSum += node.getValue(); });
-    cout << "\nDemoRaceCondition: N=" << N << ", size=" << vec.size()
-         << " (suma esperada=" << expectedSum << ", obtenida=" << actualSum << ")\n";
+    cout << "  Concurrencia (" << NThreads << " hilos): N=" << N << ", size=" << vec.size() << "\n  ";
+    if (actualSum == expectedSum) {
+        cout << "\033[42;30m [PASS] Sin Race Condition (suma=" << actualSum << ") \033[0m\n";
+    } else {
+        cout << "\033[41;37m [FAIL] Race Condition detectada \033[0m\n";
+    }
 }
 
 void DemoLinkedList() {
